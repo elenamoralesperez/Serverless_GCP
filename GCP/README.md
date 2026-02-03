@@ -332,6 +332,155 @@ gcloud dataflow flex-template run "<YOUR_DATAFLOW_JOB_NAME>" \
 
 - Once the trigger is created, each new push to the specified branch will trigger the actions specified in the build file, following the steps we set.
 
+
+
+
+## Cloud Functions
+
+#### Notification Events
+
+
+Previously, you published a message with user information to a Pub/Sub topic. Now, we are going to retrieve that message and display it.
+
+```
+cd ./GCP/02_Code/01_CloudFunction/NotificationEvents
+```
+
+First, we check that the topic exists and make sure we are using the correct one:
+
+```
+gcloud pubsub topics list
+```
+
+You have something like this:
+
+``` json
+{
+  "notification_id": "e4f1c2d3-5a67-4b89-b123-9f0a1bc2d345",
+  "created_at": "2026-02-01T12:34:56.789Z",
+  "type": "CONTINUE_LISTENING",
+  "user_id": "user_6211",
+  "ttl_sec": 1800,
+  "payload": {
+    "episode_id": "episode_007",
+    "resume_position_sec": 125
+  }
+}
+```
+
+```
+python edem_notification_creation.py \
+    --firestore_collection <FIRESTORE_NAME> \
+    --project_id <PROJECT_ID>
+```
+
+Next, we will deploy the function. This function allows us to take the episode identifier from the topic and return the default language for that user. In this case, the trigger name is the same as the topic name. Every time a message arrives, the function will output to the console the default language of that Spotify user and we are going to insert the language to Firestore.
+
+
+```
+gcloud functions deploy notification \
+  --gen2 \
+  --runtime nodejs20 \
+  --trigger-topic <TOPIC_NAME> \
+  --region europe-west1 \
+  --entry-point getEpisodeLanguage
+```
+
+
+In order to invoke the function from the topic, we need to grant it the necessary permissions.
+
+```
+gcloud functions add-iam-policy-binding notification \
+    --region europe-west1 \
+    --member="serviceAccount:<YOUR_SERVICE_ACCOUNT>" \
+    --role="roles/run.invoker"
+```
+
+
+## Cloud Run
+
+Once we’ve reviewed the full architecture, in a real project doing this exercise should help with decision-making. It shouldn’t remain as an unresolved process. Therefore, we will create a Dashboard using Streamlit.
+
+```
+cd ./GCP/02_Code/02_CloudRun
+```
+
+Build the Docker image in Artifact Registry. Run this command from the console while in the corresponding folder:
+
+```
+gcloud builds submit \
+  --tag <REGION>-docker.pkg.dev/<PROJECT_ID>/<ARTIFACT_REPOSITORY>/<IMAGE_NAME>:latest .
+```
+
+After building the image, deploy it to Cloud Run:
+
+```
+gcloud run deploy dashboard \
+  --image <REGION>-docker.pkg.dev/<PROJECT_ID>/<ARTIFACT_REPOSITORY>/<IMAGE_NAME>:latest \
+  --platform managed \
+  --region <REGION> \
+  --allow-unauthenticated
+```
+
+Certain organizations do not have permission to make URLs public due to organizational restrictions. This command allows you to access the service as if it were running locally without changing permissions or making the service public.  It allows you to test private services without exposing them publicly.
+
+```
+gcloud run services proxy <SERVICE_NAME> --region=<REGION> 
+```
+
+Open your browser and go to:
+
+http://127.0.0.1:8080/
+
+Now go to BigQuery and insert this new record into the **playback** table. Then check if the dashboard has updated with the new data.
+
+``` 
+INSERT INTO `<PROJECT_ID>.<DATASET_NAME>.<TABLE_NAME>`
+(event_id, event_time, event_type, user_id, session_id, episode_id, show_id, position_sec, duration_sec, device_type, country)
+VALUES
+(12345, DATETIME("2026-02-02 15:30:00"), "play", 67890, 111, 222, 333, 12.5, 3600, "mobile", "US");
+```
+
+***Task***
+
+- Modify main.py and create a new version.
+- Add a navigation menu to simulate a real web application.
+- Add new visualizations/charts.
+
+
+## Cloud Functions
+
+#### Transcribe Event-Driven
+
+From the perspective of a real project, there are times when we need information to be real-time. As soon as new data arrives, the entire workflow must be triggered automatically.
+
+```
+cd ./GCP/02_Code/01_CloudFunction/Transcribe
+```
+
+As a first step, we are going to create a second-generation function that will allow us to receive the event and insert it into Firestore.
+
+```
+gcloud functions deploy transcribe \
+    --gen2 \
+    --runtime python311 \
+    --trigger-event google.cloud.storage.object.v1.finalized \
+    --trigger-resource <YOUR_BUCKET_NAME> \
+    --region <YOUR_REGION> \
+    --memory 512MB \
+    --entry-point transcribe \
+    --set-env-vars BUCKET_NAME=<YOUR_BUCKET_NAME>,FIRESTORE_COLLECTION=<YOUR_FIRESTORE_COLLECTION>
+```
+
+In order to invoke the function from the bucket, we need to grant it the necessary permissions.
+
+```
+gcloud functions add-iam-policy-binding transcribe \
+    --region europe-west1 \
+    --member="<YOUR_SERVICE_ACCOUNT>" \
+    --role="roles/run.invoker"
+```
+
 ## Clean Up
 
 - List your Dataflow pipelines 
