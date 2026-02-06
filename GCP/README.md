@@ -249,14 +249,14 @@ python edem_data_generator.py \
     --firestore_collection <YOUR_FIRESTORE_COLLECTION> 
 ```
 
-- Run Streaming pipeline locally:
+- Run Streaming pipeline **locally**:
 
 ```
 python edem_realtime_recommendation_engine.py \
     --project_id <PROJECT_ID> \
-    --playback_pubsub_topic <YOUR_PLAYBACK_PUBSUB_SUBSCRIPTION_NAME> \
-    --engagement_pubsub_topic <YOUR_ENGAGEMENT_PUBSUB_SUBSCRIPTION_NAME> \
-    --quality_pubsub_topic <YOUR_QUALITY_PUBSUB_SUBSCRIPTION_NAME> \
+    --playback_pubsub_subscription_name <YOUR_PLAYBACK_PUBSUB_SUBSCRIPTION_NAME> \
+    --engagement_pubsub_subscription_name <YOUR_ENGAGEMENT_PUBSUB_SUBSCRIPTION_NAME> \
+    --quality_pubsub_subscription_name <YOUR_QUALITY_PUBSUB_SUBSCRIPTION_NAME> \
     --notifications_pubsub_topic <YOUR_NOTIFICATION_PUBSUB_TOPIC_NAME> \
     --firestore_collection <YOUR_FIRESTORE_COLLECTION> \
     --bigquery_dataset <YOUR_BIGQUERY_DATASET> \
@@ -269,9 +269,9 @@ python edem_realtime_recommendation_engine.py \
 ```
 python edem_realtime_recommendation_engine.py \
     --project_id <PROJECT_ID> \
-    --playback_pubsub_topic <YOUR_PLAYBACK_PUBSUB_TOPIC_NAME> \
-    --engagement_pubsub_topic <YOUR_ENGAGEMENT_PUBSUB_TOPIC_NAME> \
-    --quality_pubsub_topic <YOUR_QUALITY_PUBSUB_TOPIC_NAME> \
+    --playback_pubsub_subscription_name <YOUR_PLAYBACK_PUBSUB_SUBSCRIPTION_NAME> \
+    --engagement_pubsub_subscription_name <YOUR_ENGAGEMENT_PUBSUB_SUBSCRIPTION_NAME> \
+    --quality_pubsub_subscription_name <YOUR_QUALITY_PUBSUB_SUBSCRIPTION_NAME> \
     --notifications_pubsub_topic <YOUR_NOTIFICATION_PUBSUB_TOPIC_NAME> \
     --firestore_collection <YOUR_FIRESTORE_COLLECTION> \
     --bigquery_dataset <YOUR_BIGQUERY_DATASET> \
