@@ -102,7 +102,7 @@ Now, go to the [Google Cloud Storage](https://console.cloud.google.com/storage) 
 cd ./02_Code/00_Dataflow/00_DocAux
 gsutil cp -r * gs://<YOUR_BUCKET_NAME>/
 ```
-
+gcloud
 - Set the required file metadata
 
 ```
