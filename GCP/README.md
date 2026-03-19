@@ -284,6 +284,7 @@ python edem_realtime_recommendation_engine.py \
     --staging_location gs://<YOUR_GCS_BASE_BUCKET>/stg \
     --requirements_file ./requirements.txt
 ```
+<img src="./02_Code/00_Dataflow/00_DocAux/.images/edem_dataflow_batch_04.png" width="1500"/>
 
 ## Dataflow Flex Templates
 
