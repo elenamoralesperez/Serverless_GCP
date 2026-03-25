@@ -157,7 +157,8 @@ class GetMetadataFromFileDoFn(beam.DoFn):
             "show_id": blob.metadata.get("show_id"),
             "episode_id": blob.metadata.get("episode_id"),
             "duration": blob.metadata.get("duration"),
-            "status": blob.metadata.get("status")
+            "status": blob.metadata.get("status"),
+            "duration_sec": blob.metadata.get("duration_sec")
         }
 
 class FormatFirestoreDocument(beam.DoFn):
