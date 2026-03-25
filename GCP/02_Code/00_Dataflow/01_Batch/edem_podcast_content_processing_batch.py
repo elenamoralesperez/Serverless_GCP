@@ -1,4 +1,3 @@
-""" Code: Helpful functions """
 """ 
 Script: Dataflow Batch Pipeline
 
@@ -10,11 +9,10 @@ This script implements a Dataflow batch pipeline that processes podcast audio fi
 4. Stores the transcription and topic classification results in both Firestore and BigQuery.
 
 EDEM. Master Big Data & Cloud 2025/2026
-Professor: Javi Briones
+Professor: Javi Briones & Adriana Campos
 """
 
 """ Import Libraries """
-import tensorflow as tf
 
 # A. Apache Beam Libraries
 import apache_beam as beam
@@ -39,7 +37,7 @@ import io
 """ Code: Helpful functions """
 
 # Model Handler
-
+# Utiliza el modelo whisper-small de OpenAI para convertir audio en texto
 audio_model_handler = HuggingFacePipelineModelHandler(
     task=PipelineTask.AutomaticSpeechRecognition,
     model="openai/whisper-small",
@@ -47,6 +45,7 @@ audio_model_handler = HuggingFacePipelineModelHandler(
     inference_args={"return_timestamps": True}
 )
 
+# Utiliza un modelo de clasificación de texto para leer la transcripción y decidir si el tema es: Mundo, Deportes, Negocios o Ciencia/Tecnología.
 topic_model_handler = HuggingFacePipelineModelHandler(
     task=PipelineTask.TextClassification,
     model="textattack/roberta-base-ag-news",
@@ -57,6 +56,8 @@ topic_model_handler = HuggingFacePipelineModelHandler(
     }
 )
 
+# Los modelos de IA suelen devolver etiquetas como LABEL_0. Esta función las traduce a palabras legibles como "sports" o "business"
+# Además, también prepara el payload con la transcripción y la ruta del archivo en GCS para su posterior uso.
 def label_mapping(result):
     
     """
@@ -87,6 +88,11 @@ def label_mapping(result):
 
     return payload
 
+
+
+# Esta función lee el archivo de audio directamente desde GCS utilizando SoundFile.
+# Abre el archivo desde el Bucket (FileSystems.open), lo decodifica y lo convierte a "mono" (un solo canal), que es como mejor trabaja Whisper
+# Devuelve un diccionario con el array de audio, la tasa de muestreo y la ruta del archivo en GCS para su posterior uso.
 def read_audio_files(file_path):
 
     """
@@ -111,6 +117,9 @@ def read_audio_files(file_path):
         "array": audio, "sampling_rate": sr, "gcs": file_path
     }
 
+
+# Esta función extrae la transcripción del resultado de la predicción del modelo de audio. 
+# Devuelve un diccionario con la transcripción y la ruta del archivo en GCS para su posterior uso.
 def extract_text_from_prediction(prediction):
 
     """
@@ -149,7 +158,7 @@ class GetMetadataFromFileDoFn(beam.DoFn):
             "episode_id": blob.metadata.get("episode_id"),
             "duration": blob.metadata.get("duration"),
             "status": blob.metadata.get("status"),
-            "duration_sec": blob.metadata.get("duration_set"),
+            "duration_sec": blob.metadata.get("duration_sec")
         }
 
 class FormatFirestoreDocument(beam.DoFn):
@@ -189,17 +198,17 @@ def run():
     
     parser.add_argument(
                 '--firestore_collection',
-                required=True,
+                required=False,
                 help='Firestore collection name.')
     
     parser.add_argument(
                 '--bigquery_dataset',
-                required=True,
+                required=False,
                 help='BigQuery dataset name.')
     
     parser.add_argument(
                 '--bigquery_table',
-                required=True,
+                required=False,
                 help='BigQuery table name.')
     
     args, pipeline_opts = parser.parse_known_args()
@@ -220,33 +229,25 @@ def run():
 
         processed_audio_files = (
             audio_files
-                | "ReadAudioFiles" >> beam.Map(read_audio_files)
-                | "TranscribeAudio" >> RunInference(audio_model_handler)
-                | "ExtractTranscription" >> beam.Map(extract_text_from_prediction)
-                | "ClassifyTopic" >> RunInference(KeyedModelHandler(topic_model_handler))
-                | "MapLabelMapping" >> beam.Map(label_mapping)
-                | "GetMetadataFromFile" >> beam.ParDo(GetMetadataFromFileDoFn(project_id=args.project_id))
+            | "ReadAudioFiles" >> beam.Map(read_audio_files)
+            | "TranscribeAudio" >> RunInference(audio_model_handler)
+            | "ExtractTranscription" >> beam.Map(extract_text_from_prediction)
+            | "ClassifyTopic" >> RunInference(topic_model_handler)
+            | "MapLabelMapping" >> beam.Map(label_mapping)
+            | "GetMetadataFromFile" >> beam.ParDo(GetMetadataFromFileDoFn(args.project_id))
         )
 
-        processed_audio_files | "WriteToFirestore" >> beam.ParDo(
-            FormatFirestoreDocument(
-                firestore_collection=args.firestore_collection,project_id=args.project_id)
-        )
-        
-        (
-            processed_audio_files |
-            "WriteToBigQuery" >> beam.io.WriteToBigQuery(
-                table=f"{args.project_id}:{args.bigquery_dataset}.{args.bigquery_table}",
-                schema = "title:STRING, show_id:STRING, episode_id:STRING, duration:STRING, status:STRING, transcription:STRING, label:STRING, duration_sec:STRING",
-                write_disposition=beam.io.BigQueryDisposition.WRITE_APPEND,
-                create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
-                method=beam.io.WriteToBigQuery.Method.FILE_LOADS,
-                custom_gcs_temp_location = f'gs://{args.bucket_name}/temp/',
-                additional_bq_parameters={
-                    "schemaUpdateOptions": ["ALLOW_FIELD_ADDITION"]
-                }
-            )
-        )
+        processed_audio_files | "WriteToFirestore" >> beam.ParDo(FormatFirestoreDocument(args.firestore_collection, args.project_id))
+
+#         (
+#             processed_audio_files |
+#             "WriteToBigQuery" >> beam.io.WriteToBigQuery(
+#                 f"{args.project_id}:{args.bigquery_dataset}.{args.bigquery_table}",
+#                 schema="transcription:STRING, label:STRING, title:STRING, show_id:STRING, episode_id:STRING, duration:STRING, status:STRING",
+#                 write_disposition=beam.io.BigQueryDisposition.WRITE_APPEND,
+#                 create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED
+#             )
+#         )
 
 if __name__ == '__main__':
 
